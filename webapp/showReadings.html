@@ -1,0 +1,30 @@
+<!DOCTYPE HTML>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>Online meter reading history</title>
+		<link rel="stylesheet" href="//ajax.googleapis.com/ajax/libs/dojo/1.8.3/dijit/themes/claro/claro.css" media="screen">
+		<link rel="stylesheet" href="//ajax.googleapis.com/ajax/libs/dojo/1.8.3/dojox/grid/resources/Grid.css" >
+		<link rel="stylesheet" href="//ajax.googleapis.com/ajax/libs/dojo/1.8.3/dojox/grid/resources/claroGrid.css" >
+		<script src="weekOfYear.js"></script>
+		<script src="//ajax.googleapis.com/ajax/libs/dojo/1.8.3/dojo/dojo.js"></script>
+		<script src="readingsGraph.js"></script>
+<style type="text/css">
+
+/*Grid needs an explicit height by default*/
+#grid {
+    height: 20em;
+}
+	</style>
+	</head>
+	<body>
+		<h1>Meter readings shown over time</h1>
+		<p>Hover over a point to see the date and weekly number of units generated</p>
+		
+		<div id="chartNode" style="width:800px;height:400px;"></div>
+		<p></p>
+		<div id="totals" style=""></div>
+		<p></p>
+	        <div id="grid" style="clear: both;"></div>	
+	</body>
+</html>
