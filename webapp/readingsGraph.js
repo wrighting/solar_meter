@@ -40,6 +40,13 @@ require([  "dojo/dom-construct", "dojo/dom", "dojox/charting/widget/Legend","doj
 	var dstore = new DataStore({
 		store : dataStore
 	});
+	function calculateFIT(start, end) {
+		var units = end["total"] - start["total"];
+		var base = 39.6;
+		var feedIn = 3.2;
+		qt = ((units * base) + ((units/2) * feedIn)) / 100;
+		return (qt.toFixed(2));
+	}
 	dstore.query().forEach(function(reading) {
 		var d = timeStampToDate(reading["TimeStamp"]);
 		reading["weekOfYear"] = d.getWeek();
@@ -62,13 +69,14 @@ require([  "dojo/dom-construct", "dojo/dom", "dojox/charting/widget/Legend","doj
 	var latest = mstore.get(weekNo - 1);
 	var qTotal = latest["total"] - quarter["total"];
 	var node = dom.byId("totals");
-	var w = domConstruct.create("div", { innerHTML: "This week:" + latest["reading"].toFixed(2) }, node);
+	var w = domConstruct.create("div", { innerHTML: "This week:" + latest["reading"].toFixed(2) + " (&pound; " + calculateFIT(lastWeek,latest) + ")"}, node);
 	mstore.query({weekOfYear: latest["weekOfYear"]}).forEach(function (previousYear) {
 		domConstruct.create("div", { innerHTML: "This week in " + previousYear["TimeStamp"].substr(6,4) +":" + previousYear["reading"].toFixed(2) }, node);
 	});
 	
 	var l = domConstruct.create("div", { innerHTML: "Last week:" + lastWeek["reading"].toFixed(2) }, node);
-	var q = domConstruct.create("div", { innerHTML: "This quarter:" + qTotal.toFixed(2) }, node);
+	var qt = ((qTotal * 39.6) + ((qTotal/2) * 3.2)) / 100;
+	var q = domConstruct.create("div", { innerHTML: "This quarter:" + qTotal.toFixed(2) + " (&pound; " + calculateFIT(quarter,latest) + ")"}, node);
 console.log(qTotal.toFixed(2));
 //console.log(results);
 	});
