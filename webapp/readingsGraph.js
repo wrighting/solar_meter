@@ -1,10 +1,11 @@
 // Require all dependencies
-require([  "dojo/_base/lang", "dojo/dom-construct", "dojo/dom", "dojox/charting/widget/Legend","dojox/charting/action2d/Tooltip", "dojox/grid/DataGrid",
+require([  "dojo/_base/lang", "dojo/dom-construct", "dojo/dom", "dojo/topic",
+		"dojox/charting/widget/Legend","dojox/charting/action2d/Tooltip", "dojox/grid/DataGrid",
 		"dojo/data/ObjectStore", "dojo/store/DataStore", "dojo/store/Memory", "dojox/charting/Chart",
 		"dojox/charting/themes/Claro", "dojo/store/Observable",
 		"dojox/data/CsvStore", "dojox/charting/StoreSeries",
 		"dojox/charting/plot2d/Lines", "dojox/charting/axis2d/Default",
-		"dojo/domReady!" ], function(lang, domConstruct, dom, Legend, Tooltip, DataGrid, ObjectStore, DataStore, Memory,
+		"dojo/domReady!" ], function(lang, domConstruct, dom, topic, Legend, Tooltip, DataGrid, ObjectStore, DataStore, Memory,
 		Chart, Claro, Observable, CsvStore, StoreSeries) {
 
 	// Create the data store
@@ -40,49 +41,63 @@ require([  "dojo/_base/lang", "dojo/dom-construct", "dojo/dom", "dojox/charting/
 	var dstore = new DataStore({
 		store : dataStore
 	});
+	topic.subscribe("weekLoaded", function () {
+		outputStats(mstore, weekNo);
+	});
 	function calculateFIT(start, end) {
-		var units = end["total"] - start["total"];
+		var units = start["reading"];
+		if (end) {
+			units = end["total"] - start["total"];
+		}
 		var base = 39.6;
 		var feedIn = 3.2;
 		qt = ((units * base) + ((units/2) * feedIn)) / 100;
 		return (qt.toFixed(2));
 	}
+	var lastValue = 0;
 	dstore.query().forEach(function(reading) {
 		var d = timeStampToDate(reading["TimeStamp"]);
-		reading["weekOfYear"] = d.getWeek();
-		reading["weekNo"] = weekNo++;
-		var read = reading["IncTotalValue"];
-		// Account for first week
-		if (read == undefined) {
-			read = reading["TotalValue"];
-		}
-		reading["reading"] = parseFloat(read);
-		reading["total"] = parseFloat(reading["TotalValue"]);
-		var id = dstore.getIdentity(reading);
-		// dstore.put(reading, { overwrite: true });
 		//Only collect values for first day of week
 		if (d.getDay() == 1) {
-			mstore.add(reading);
+			reading["weekOfYear"] = d.getWeek();
+			reading["weekNo"] = weekNo++;
+			var read = reading["IncTotalValue"];
+			// Account for first week
+			if (read == undefined) {
+				read = reading["TotalValue"];
+			}
+			reading["reading"] = parseFloat(read);
+			reading["total"] = parseFloat(reading["TotalValue"]);
+			//Do our own calculation as using weekly totals not daily 
+			reading["reading"] = reading["total"] - lastValue;
+			lastValue = reading["total"];
+		// dstore.put(reading, { overwrite: true });
+			mstore.add(reading, { id: weekNo - 1 });
 		}
 
 	}).then(function () {
-
-	var quarter = mstore.get(weekNo - 14);
-	var lastWeek = mstore.get(weekNo - 2);
-	var latest = mstore.get(weekNo - 1);
-	var qTotal = latest["total"] - quarter["total"];
-	var node = dom.byId("totals");
-	var w = domConstruct.create("div", { innerHTML: "This week:" + latest["reading"].toFixed(2) + " (&pound; " + calculateFIT(lastWeek,latest) + ")"}, node);
-	mstore.query({weekOfYear: latest["weekOfYear"]}).forEach(function (previousYear) {
-		domConstruct.create("div", { innerHTML: "This week in " + previousYear["TimeStamp"].substr(6,4) +":" + previousYear["reading"].toFixed(2) }, node);
+		topic.publish("weekLoaded");
 	});
+
+	function outputStats(weekStore, weekNo) {
+
+		var quarter = weekStore.get(weekNo - 14);
+		var lastWeek = weekStore.get(weekNo - 2);
+		var latest = weekStore.get(weekNo - 1);
+		var qTotal = latest["total"] - quarter["total"];
+		var node = dom.byId("totals");
+		//var w = domConstruct.create("div", { innerHTML: "This week:" + latest["reading"].toFixed(2) + " (&pound; " + calculateFIT(lastWeek,latest) + ")"}, node);
+		weekStore.query({weekOfYear: latest["weekOfYear"]}).forEach(function (previousYear) {
+			domConstruct.create("div", { innerHTML: "This week in " + previousYear["TimeStamp"].substr(6,4) +": " + previousYear["reading"].toFixed(2) + " (&pound; " + calculateFIT(previousYear) + ")" }, node);
+		});
 	
-	var l = domConstruct.create("div", { innerHTML: "Last week:" + lastWeek["reading"].toFixed(2) }, node);
-	var qt = ((qTotal * 39.6) + ((qTotal/2) * 3.2)) / 100;
-	var q = domConstruct.create("div", { innerHTML: "This quarter:" + qTotal.toFixed(2) + " (&pound; " + calculateFIT(quarter,latest) + ")"}, node);
+		var l = domConstruct.create("div", { innerHTML: "Last week:" + lastWeek["reading"].toFixed(2) + " (&pound; " + calculateFIT(lastWeek) + ")"}, node);
+		var qt = ((qTotal * 39.6) + ((qTotal/2) * 3.2)) / 100;
+		var q = domConstruct.create("div", { innerHTML: "This quarter:" + qTotal.toFixed(2) + " (&pound; " + calculateFIT(quarter,latest) + ")"}, node);
 //console.log(qTotal.toFixed(2));
 //console.log(results);
-	});
+	};
+
 	var store = dstore;
 	// Create the chart within it's "holding" node
 	// Global so users can hit it from the console
