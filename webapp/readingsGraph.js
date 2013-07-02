@@ -1,10 +1,10 @@
 // Require all dependencies
-require([  "dojo/dom-construct", "dojo/dom", "dojox/charting/widget/Legend","dojox/charting/action2d/Tooltip", "dojox/grid/DataGrid",
-		"dojo/store/DataStore", "dojo/store/Memory", "dojox/charting/Chart",
+require([  "dojo/_base/lang", "dojo/dom-construct", "dojo/dom", "dojox/charting/widget/Legend","dojox/charting/action2d/Tooltip", "dojox/grid/DataGrid",
+		"dojo/data/ObjectStore", "dojo/store/DataStore", "dojo/store/Memory", "dojox/charting/Chart",
 		"dojox/charting/themes/Claro", "dojo/store/Observable",
 		"dojox/data/CsvStore", "dojox/charting/StoreSeries",
 		"dojox/charting/plot2d/Lines", "dojox/charting/axis2d/Default",
-		"dojo/domReady!" ], function(domConstruct, dom, Legend, Tooltip, DataGrid, DataStore, Memory,
+		"dojo/domReady!" ], function(lang, domConstruct, dom, Legend, Tooltip, DataGrid, ObjectStore, DataStore, Memory,
 		Chart, Claro, Observable, CsvStore, StoreSeries) {
 
 	// Create the data store
@@ -60,7 +60,10 @@ require([  "dojo/dom-construct", "dojo/dom", "dojox/charting/widget/Legend","doj
 		reading["total"] = parseFloat(reading["TotalValue"]);
 		var id = dstore.getIdentity(reading);
 		// dstore.put(reading, { overwrite: true });
-		mstore.add(reading);
+		//Only collect values for first day of week
+		if (d.getDay() == 1) {
+			mstore.add(reading);
+		}
 
 	}).then(function () {
 
@@ -77,7 +80,7 @@ require([  "dojo/dom-construct", "dojo/dom", "dojox/charting/widget/Legend","doj
 	var l = domConstruct.create("div", { innerHTML: "Last week:" + lastWeek["reading"].toFixed(2) }, node);
 	var qt = ((qTotal * 39.6) + ((qTotal/2) * 3.2)) / 100;
 	var q = domConstruct.create("div", { innerHTML: "This quarter:" + qTotal.toFixed(2) + " (&pound; " + calculateFIT(quarter,latest) + ")"}, node);
-console.log(qTotal.toFixed(2));
+//console.log(qTotal.toFixed(2));
 //console.log(results);
 	});
 	var store = dstore;
@@ -107,34 +110,49 @@ console.log(qTotal.toFixed(2));
 		minorTickStep : 1,
 		min : 0
 	});
-	function getValueObject(item, store) {
-		var dp = item["TimeStamp"].split('/');
-		var d = new Date(dp[2].substr(0, 4), dp[1] - 1, dp[0]);
-		var reading = item["IncTotalValue"];
+	var currentTotal = 0;
+	var years = [ "2011", "2012", "2013" ];
+
+	for (i = 0; i < years.length; i++) {
+		filter = "*" + years[i] + "*";
+		var year = { year: years[i], currentTotal: 0 };
+		var filter = dojo.hitch(year, 
+			function(object) {
+				var dp = object["TimeStamp"].split('/');
+				var d = new Date(dp[2].substr(0, 4), dp[1] - 1, dp[0]);
+				if (d.getFullYear() == this.year) {
+					return true;
+				} else {
+					return false;
+				}
+						});
+		var seriesValues = dojo.hitch(year,
+	function (item, store) {
+		var reading = parseFloat(item["total"]) - this.currentTotal;
+		this.currentTotal = parseFloat(item["total"]);
+
 		// Account for first week
-		if (reading == undefined) {
-			reading = item["TotalValue"];
+
+		if (reading <= 0) {
+			reading = parseFloat(item["reading"]);
 		}
+
 		// let's create our object
 		var o = {
-			y : parseFloat(reading),
-			x : d.getWeek(),
+			y : reading,
+			x : item["weekOfYear"],
 			tooltip : item["TimeStamp"].substr(0, 10) + " "
-					+ item["IncTotalValue"],
+					+ reading.toFixed(2),
 			color : "red"
 		};
 		// we can massage the object, if we want, and return it
 		return o;
 	}
-	var years = [ "2011", "2012", "2013" ];
-
-	for (i = 0; i < years.length; i++) {
-		filter = "*" + years[i] + "*";
-		series = new StoreSeries(store, {
-			query : {
-				TimeStamp : filter
-			}
-		}, getValueObject);
+		);
+		var series = new StoreSeries(mstore, {
+			//query : { TimeStamp : filter }
+			query: filter
+		}, seriesValues);
 		chart.addSeries("y" + i, series);
 	}
 	// Render the chart!
